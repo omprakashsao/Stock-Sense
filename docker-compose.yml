@@ -1,0 +1,24 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    container_name: stocksense_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist SQLite database across container restarts
+      - stocksense_data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  stocksense_data:
+    driver: local

@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockSense — JarNox Dashboard</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
+  <style>
+    /* ─── Design tokens ─── */
+    :root {
+      --bg:        #0c0f14;
+      --surface:   #131720;
+      --surface2:  #1a2030;
+      --border:    #1f2a3a;
+      --border2:   #2a3a52;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --accent:    #38bdf8;
+      --accent2:   #818cf8;
+      --green:     #34d399;
+      --red:       #f87171;
+      --gold:      #fbbf24;
+      --font-head: 'DM Serif Display', serif;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --radius:    12px;
+      --shadow:    0 4px 24px rgba(0,0,0,0.4);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 14px;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ─── Header ─── */
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-family: var(--font-head); font-size: 1.7rem; color: var(--text); }
+    .logo span { color: var(--accent); }
+    .badge {
+      font-family: var(--font-mono); font-size: 11px;
+      background: var(--accent); color: #0c0f14;
+      padding: 3px 10px; border-radius: 20px; font-weight: 500;
+    }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    #clock {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--muted); letter-spacing: 0.05em;
+    }
+
+    /* ─── Sidebar ─── */
+    aside {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 20px 12px;
+    }
+    .sidebar-title {
+      font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+      color: var(--muted); margin: 8px 12px 12px;
+    }
+    .company-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius);
+      cursor: pointer; transition: all 0.2s;
+      margin-bottom: 3px;
+    }
+    .company-item:hover { background: var(--surface2); }
+    .company-item.active {
+      background: linear-gradient(135deg, #1e3a5f, #1a2a4a);
+      border-left: 3px solid var(--accent);
+    }
+    .company-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent); flex-shrink: 0;
+    }
+    .company-sym {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--accent); font-weight: 500; min-width: 80px;
+    }
+    .company-name { font-size: 12px; color: var(--muted); }
+
+    /* ─── Main ─── */
+    main {
+      overflow-y: auto;
+      padding: 28px 32px;
+      display: flex; flex-direction: column; gap: 24px;
+    }
+
+    /* ─── Stat cards ─── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+    }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+      position: relative; overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .stat-card:hover { border-color: var(--border2); }
+    .stat-card::before {
+      content: ''; position: absolute; inset: 0;
+      background: linear-gradient(135deg, rgba(56,189,248,0.04), transparent);
+      pointer-events: none;
+    }
+    .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+    .stat-value { font-family: var(--font-mono); font-size: 1.4rem; font-weight: 500; margin: 6px 0 4px; }
+    .stat-sub { font-size: 11px; color: var(--muted); }
+    .up   { color: var(--green); }
+    .down { color: var(--red); }
+
+    /* ─── Section header ─── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .section-title { font-family: var(--font-head); font-size: 1.15rem; }
+    .pill-row { display: flex; gap: 6px; }
+    .pill {
+      font-family: var(--font-mono); font-size: 11px;
+      border: 1px solid var(--border2); color: var(--muted);
+      padding: 4px 12px; border-radius: 20px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .pill:hover, .pill.active {
+      background: var(--accent); color: #0c0f14;
+      border-color: var(--accent); font-weight: 500;
+    }
+
+    /* ─── Chart card ─── */
+    .chart-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .chart-wrap { position: relative; height: 280px; }
+
+    /* ─── Compare ─── */
+    .compare-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .compare-inputs { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    select, button {
+      font-family: var(--font-body); font-size: 13px;
+      background: var(--surface2); color: var(--text);
+      border: 1px solid var(--border2); border-radius: 8px;
+      padding: 9px 14px; cursor: pointer;
+    }
+    select:focus, button:focus { outline: 2px solid var(--accent); }
+    button.primary {
+      background: var(--accent); color: #0c0f14;
+      font-weight: 600; border-color: var(--accent);
+      transition: opacity 0.2s;
+    }
+    button.primary:hover { opacity: 0.85; }
+    .compare-result {
+      margin-top: 18px; display: grid;
+      grid-template-columns: 1fr 1fr; gap: 14px;
+    }
+    .compare-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+    }
+    .compare-sym { font-family: var(--font-mono); font-size: 1rem; color: var(--accent); }
+    .compare-metric { display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; }
+    .compare-metric span:last-child { font-family: var(--font-mono); }
+    .corr-badge {
+      margin-top: 14px; text-align: center; padding: 10px;
+      background: var(--surface2); border-radius: 8px;
+      font-size: 13px; color: var(--muted);
+    }
+    .corr-badge strong { color: var(--text); font-family: var(--font-mono); }
+
+    /* ─── Gainers / Losers ─── */
+    .gl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .gl-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px;
+    }
+    .gl-title { font-size: 12px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; }
+    .gl-title.gainer { color: var(--green); }
+    .gl-title.loser  { color: var(--red); }
+    .gl-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .gl-row:last-child { border-bottom: none; }
+    .gl-sym { font-family: var(--font-mono); font-size: 13px; }
+    .gl-name { font-size: 11px; color: var(--muted); }
+    .gl-pct { font-family: var(--font-mono); font-weight: 500; }
+
+    /* ─── Loader / empty ─── */
+    .loader { text-align: center; padding: 40px; color: var(--muted); }
+    .spinner {
+      display: inline-block; width: 24px; height: 24px;
+      border: 2px solid var(--border2);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 760px) {
+      body { grid-template-columns: 1fr; }
+      aside { display: none; }
+      main { padding: 16px; }
+      .compare-result, .gl-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ─── Fade-in ─── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeUp 0.35s ease both; }
+
+    /* ─── Volatility gauge ─── */
+    .vol-gauge { display: flex; align-items: center; gap: 8px; }
+    .vol-bar {
+      flex: 1; height: 6px; border-radius: 3px;
+      background: var(--border2); overflow: hidden;
+    }
+    .vol-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+    .vol-low  { background: var(--green); }
+    .vol-mid  { background: var(--gold); }
+    .vol-high { background: var(--red); }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════ HEADER ══════════════ -->
+<header>
+  <div class="logo">Stock<span>Sense</span></div>
+  <div class="header-right">
+    <span id="clock"></span>
+    <span class="badge">NSE / BSE</span>
+  </div>
+</header>
+
+<!-- ══════════════ SIDEBAR ══════════════ -->
+<aside id="sidebar">
+  <div class="sidebar-title">Companies</div>
+  <div id="company-list"><div class="loader"><div class="spinner"></div></div></div>
+</aside>
+
+<!-- ══════════════ MAIN ══════════════ -->
+<main id="main">
+  <!-- Welcome state -->
+  <div id="welcome" class="fade-in" style="text-align:center;padding:80px 0;color:var(--muted);">
+    <div style="font-family:var(--font-head);font-size:2rem;color:var(--text);margin-bottom:12px;">
+      Select a company
+    </div>
+    <div>Click any symbol on the left to load its dashboard.</div>
+  </div>
+
+  <!-- Stock dashboard (hidden until selected) -->
+  <div id="dashboard" style="display:none;flex-direction:column;gap:24px;">
+
+    <!-- Stats row -->
+    <div id="stats-row" class="stats-row fade-in"></div>
+    <div id="insights-row" class="stats-row fade-in"></div>
+    <!-- 
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        
+      <div class="chart-card fade-in" style="min-height:180px;">
+        <div class="section-header">
+          <div class="section-title">🧠 AI Insights</div>
+        </div>
+        <div id="insights-content" style="font-size:13px;color:var(--muted);">
+          Loading insights...
+        </div>
+      </div>
+      <div class="chart-card fade-in" style="min-height:180px;">
+        <div class="section-header">
+          <div class="section-title">⚡ Quick Highlights</div>
+        </div>
+        <div id="quick-stats" style="font-size:13px;color:var(--muted);">
+          Loading...
+        </div>
+      </div> 
+  
+
+  
+
+-->
+
+</div>
+
+    <!-- Price chart -->
+    <div class="chart-card fade-in">
+      <div class="section-header">
+        <div class="section-title" id="chart-title">Closing Price</div>
+        <div class="pill-row" id="day-pills">
+          <span class="pill active" data-days="30">30D</span>
+          <span class="pill" data-days="90">90D</span>
+          <span class="pill" data-days="180">180D</span>
+          <span class="pill" data-days="365">1Y</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+
+
+    <!-- ML Prediction Chart -->
+    <div class="chart-card fade-in" id="predict-card">
+      <div class="section-header">
+        <div>
+          <div class="section-title">&#x1F9E0; ML Price Prediction</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">Polynomial Regression &middot; trained on 90 days &middot; 95% confidence band</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div id="predict-meta" style="font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:right;"></div>
+          <select id="forecastDays" style="font-size:11px;padding:5px 10px;">
+            <option value="7">7 days</option>
+            <option value="14" selected>14 days</option>
+            <option value="21">21 days</option>
+            <option value="30">30 days</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="predictChart"></canvas></div>
+    </div>
+
+    <!-- Gainers / Losers -->
+    <div class="gl-grid fade-in">
+      <div class="gl-card">
+        <div class="gl-title gainer">▲ Top Gainers (7D)</div>
+        <div id="gainers-list"><div class="loader"><div class="spinner"></div></div></div>
+      </div>
+      <div class="gl-card">
+        <div class="gl-title loser">▼ Top Losers (7D)</div>
+        <div id="losers-list"><div class="loader"><div class="spinner"></div></div></div>
+      </div>
+    </div>
+
+    <!-- Compare -->
+    <div class="compare-card fade-in">
+      <div class="section-header">
+        <div class="section-title">Compare Stocks</div>
+      </div>
+      <div class="compare-inputs">
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Symbol 1</div>
+          <select id="cmp1"></select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Symbol 2</div>
+          <select id="cmp2"></select>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:5px;">Period</div>
+          <select id="cmpDays">
+            <option value="30">30 days</option>
+            <option value="90">90 days</option>
+            <option value="180">180 days</option>
+          </select>
+        </div>
+        <button class="primary" onclick="runCompare()">Compare →</button>
+      </div>
+      <div id="compare-result"></div>
+    </div>
+
+  </div><!-- /#dashboard -->
+</main>
+
+<script>
+  const API = 'http://localhost:8000';
+  let allCompanies = [];
+  let selectedSymbol = null;
+  let selectedDays = 30;
+  let priceChart = null;
+
+  // ── Clock ──
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Fetch wrapper ──
+  async function api(path) {
+    const r = await fetch(API + path);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  // ── Load companies ──
+  async function loadCompanies() {
+    try {
+      allCompanies = await api('/companies');
+      renderSidebar(allCompanies);
+      populateCompareSelects(allCompanies);
+      loadGainersLosers();
+    } catch(e) {
+      document.getElementById('company-list').innerHTML =
+        `<div class="loader" style="color:var(--red);">⚠ Cannot reach API.<br><small>${e.message}</small></div>`;
+    }
+  }
+
+  function renderSidebar(companies) {
+    const container = document.getElementById('company-list');
+    container.innerHTML = companies.map(c => `
+      <div class="company-item" onclick="selectCompany('${c.symbol}')" id="item-${c.symbol}">
+        <div class="company-dot"></div>
+        <div>
+          <div class="company-sym">${c.symbol}</div>
+          <div class="company-name">${c.name}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function populateCompareSelects(companies) {
+    const opts = companies.map(c => `<option value="${c.symbol}">${c.symbol}</option>`).join('');
+    document.getElementById('cmp1').innerHTML = opts;
+    document.getElementById('cmp2').innerHTML = opts;
+    document.getElementById('cmp2').selectedIndex = 1;
+  }
+
+  // ── Select company ──
+  async function selectCompany(symbol) {
+    // Update sidebar
+    document.querySelectorAll('.company-item').forEach(el => el.classList.remove('active'));
+    document.getElementById('item-' + symbol)?.classList.add('active');
+
+    selectedSymbol = symbol;
+    document.getElementById('welcome').style.display = 'none';
+    const dash = document.getElementById('dashboard');
+    dash.style.display = 'flex';
+
+    loadDashboard(symbol, selectedDays);
+  }
+
+  // ── Day-pill listeners ──
+  document.querySelectorAll('.pill[data-days]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.pill[data-days]').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      selectedDays = parseInt(pill.dataset.days);
+      if (selectedSymbol) loadDashboard(selectedSymbol, selectedDays);
+    });
+  });
+
+  // ── Load full dashboard ──
+  async function loadDashboard(symbol, days) {
+
+   
+
+    document.getElementById('stats-row').innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    document.getElementById('chart-title').textContent = `${symbol} — Closing Price`;
+    
+    try {
+      const [stockData, summary, insights] = await Promise.all([
+        api(`/data/${symbol}?days=${days}`),
+        api(`/summary/${symbol}`),
+        api(`/insights/${symbol}`)
+      ]);
+      //loadInsights(symbol);
+      renderInsightsRow(summary, insights);
+      //renderQuickStats(summary);
+      renderStats(summary);
+      renderChart(symbol, stockData?.data || [], days);
+      // Load ML prediction in parallel (non-blocking)
+      const fdays = document.getElementById('forecastDays').value;
+      loadPrediction(symbol, fdays);
+    } catch(e) {
+      console.error(e);
+    }
+  }
+
+  // ── Stats ──
+  function renderStats(s) {
+    const retClass = s.avg_daily_return >= 0 ? 'up' : 'down';
+    const totalClass = s.total_return_pct >= 0 ? 'up' : 'down';
+    const sign = v => v >= 0 ? '+' : '';
+
+    const vol = s.volatility_score;
+    const volPct = Math.min(vol / 3 * 100, 100); // scale to 3% max
+    const volClass = vol < 1 ? 'vol-low' : vol < 2 ? 'vol-mid' : 'vol-high';
+
+    document.getElementById('stats-row').innerHTML = `
+      <div class="stat-card">
+        <div class="stat-label">Latest Close</div>
+        <div class="stat-value">₹${s.latest_close.toLocaleString('en-IN')}</div>
+        <div class="stat-sub ${totalClass}">${sign(s.total_return_pct)}${s.total_return_pct}% period return</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">52-Week High</div>
+        <div class="stat-value up">₹${s['52w_high'].toLocaleString('en-IN')}</div>
+        <div class="stat-sub">Annual peak</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">52-Week Low</div>
+        <div class="stat-value down">₹${s['52w_low'].toLocaleString('en-IN')}</div>
+        <div class="stat-sub">Annual floor</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Daily Return</div>
+        <div class="stat-value ${retClass}">${sign(s.avg_daily_return)}${s.avg_daily_return}%</div>
+        <div class="stat-sub">52-week window</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Volatility Score</div>
+        <div class="stat-value">${vol.toFixed(3)}</div>
+        <div class="vol-gauge" style="margin-top:8px;">
+          <div class="vol-bar"><div class="vol-fill ${volClass}" style="width:${volPct}%"></div></div>
+          <span style="font-size:10px;color:var(--muted);">${vol < 1 ? 'Low' : vol < 2 ? 'Mid' : 'High'}</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Sector</div>
+        <div class="stat-value" style="font-size:1rem;font-family:var(--font-body)">${s.sector}</div>
+        <div class="stat-sub">${s.name}</div>
+      </div>
+    `;
+  }
+
+  // ── Linear Regression helper ──
+  function linearRegression(values) {
+    const n = values.length;
+    const xs = values.map((_, i) => i);
+    const meanX = (n - 1) / 2;
+    const meanY = values.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (i - meanX) * (values[i] - meanY);
+      den += (i - meanX) ** 2;
+    }
+    const slope = den ? num / den : 0;
+    const intercept = meanY - slope * meanX;
+    // Fit line over existing points + 14 future points
+    const futurePoints = 14;
+    const result = [];
+    for (let i = 0; i < n + futurePoints; i++) {
+      result.push(parseFloat((slope * i + intercept).toFixed(2)));
+    }
+    return { line: result, slope, futurePoints };
+  }
+
+  // ── Price Chart ──
+  function renderChart(symbol, data, days) {
+    const labels  = data.map(d => d.date);
+    const closes  = data.map(d => d.close);
+    const ma7s    = data.map(d => d.ma7);
+
+    // Build future date labels for prediction
+    const lastDate = new Date(labels[labels.length - 1]);
+    const { line: regression, slope, futurePoints } = linearRegression(closes);
+    const extendedLabels = [...labels];
+    for (let i = 1; i <= futurePoints; i++) {
+      const d = new Date(lastDate);
+      // Skip weekends
+      let added = 0;
+      let cursor = new Date(lastDate);
+      while (added < i) {
+        cursor.setDate(cursor.getDate() + 1);
+        if (cursor.getDay() !== 0 && cursor.getDay() !== 6) added++;
+      }
+      extendedLabels.push(cursor.toISOString().slice(0, 10));
+    }
+    // Pad historical datasets with null for future slots
+    const closesExt = [...closes, ...Array(futurePoints).fill(null)];
+    const ma7sExt   = [...ma7s,   ...Array(futurePoints).fill(null)];
+
+    const trendLabel = slope >= 0 ? '📈 Bullish Trend' : '📉 Bearish Trend';
+    document.getElementById('chart-title').textContent =
+      `${symbol} — Closing Price  ·  ${trendLabel}`;
+
+    if (priceChart) priceChart.destroy();
+
+    const ctx = document.getElementById('priceChart').getContext('2d');
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, 0, 0, 280);
+    grad.addColorStop(0, 'rgba(56,189,248,0.25)');
+    grad.addColorStop(1, 'rgba(56,189,248,0)');
+
+    // Prediction gradient
+    const predGrad = ctx.createLinearGradient(0, 0, 0, 280);
+    predGrad.addColorStop(0, slope >= 0 ? 'rgba(52,211,153,0.15)' : 'rgba(248,113,113,0.15)');
+    predGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+    const predColor = slope >= 0 ? '#34d399' : '#f87171';
+
+    priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: extendedLabels,
+        datasets: [
+          {
+            label: 'Close Price',
+            data: closesExt,
+            borderColor: '#38bdf8',
+            backgroundColor: grad,
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.35,
+            fill: true,
+          },
+          {
+            label: '7-Day MA',
+            data: ma7sExt,
+            borderColor: '#fbbf24',
+            borderDash: [5, 4],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.35,
+            fill: false,
+          },
+          {
+            label: 'ML Prediction (Linear Regression)',
+            data: regression,
+            borderColor: predColor,
+            backgroundColor: predGrad,
+            borderDash: [3, 5],
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.2,
+            fill: false,
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: {
+            labels: { color: '#64748b', font: { family: 'DM Mono', size: 11 }, boxWidth: 24 }
+          },
+          tooltip: {
+            backgroundColor: '#131720',
+            borderColor: '#1f2a3a',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ₹${ctx.parsed.y?.toLocaleString('en-IN') ?? 'N/A'}`,
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              color: '#64748b', font: { family: 'DM Mono', size: 10 },
+              maxTicksLimit: days <= 30 ? 10 : 8,
+              maxRotation: 0,
+            },
+            grid: { color: '#1f2a3a' }
+          },
+          y: {
+            ticks: {
+              color: '#64748b', font: { family: 'DM Mono', size: 10 },
+              callback: v => '₹' + v.toLocaleString('en-IN'),
+            },
+            grid: { color: '#1f2a3a' }
+          }
+        }
+      }
+    });
+  }
+
+  // ── Gainers / Losers ──
+  async function loadGainersLosers() {
+    try {
+      const data = await api('/gainers-losers?days=7');
+      renderGL('gainers-list', data.gainers, true);
+      renderGL('losers-list', data.losers, false);
+    } catch(e) {
+      document.getElementById('gainers-list').innerHTML = '<div class="loader">–</div>';
+      document.getElementById('losers-list').innerHTML  = '<div class="loader">–</div>';
+    }
+  }
+
+  function renderGL(id, items, isGainer) {
+    const container = document.getElementById(id);
+    if (!items || items.length === 0) {
+      container.innerHTML = '<div class="loader">No data</div>';
+      return;
+    }
+    container.innerHTML = items.map(item => `
+      <div class="gl-row">
+        <div>
+          <div class="gl-sym">${item.symbol}</div>
+          <div class="gl-name">${item.name}</div>
+        </div>
+        <div class="gl-pct ${isGainer ? 'up' : 'down'}">
+          ${isGainer ? '▲' : '▼'} ${Math.abs(item.change_pct)}%
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── Compare ──
+  async function runCompare() {
+    const s1   = document.getElementById('cmp1').value;
+    const s2   = document.getElementById('cmp2').value;
+    const days = document.getElementById('cmpDays').value;
+    const res  = document.getElementById('compare-result');
+
+    if (s1 === s2) {
+      res.innerHTML = '<div class="loader" style="color:var(--red);">Select two different symbols.</div>';
+      return;
+    }
+
+    res.innerHTML = '<div class="loader"><div class="spinner"></div></div>';
+    try {
+      const data = await api(`/compare?symbol1=${s1}&symbol2=${s2}&days=${days}`);
+      const p1 = data[s1], p2 = data[s2];
+
+      const metric = (label, v1, v2, unit='', higher='neutral') => {
+        const w1 = higher === 'up'   ? (parseFloat(v1) > parseFloat(v2) ? 'up'   : '')
+                 : higher === 'down' ? (parseFloat(v1) < parseFloat(v2) ? 'up'   : '')
+                 : '';
+        const w2 = higher === 'up'   ? (parseFloat(v2) > parseFloat(v1) ? 'up'   : '')
+                 : higher === 'down' ? (parseFloat(v2) < parseFloat(v1) ? 'up'   : '')
+                 : '';
+        return `
+          <div class="compare-metric">
+            <span style="color:var(--muted)">${label}</span>
+            <span class="${w1}">${unit}${v1}</span>
+          </div>
+          <div class="compare-metric" style="margin-left:auto;display:none"></div>
+        `;
+      };
+
+      res.innerHTML = `
+        <div class="compare-result">
+          ${[s1, s2].map(sym => {
+            const p = data[sym];
+            return `
+              <div class="compare-box">
+                <div class="compare-sym">${sym}</div>
+                <div class="compare-metric">
+                  <span style="color:var(--muted)">Latest Close</span>
+                  <span style="font-family:var(--font-mono)">₹${p.latest_close.toLocaleString('en-IN')}</span>
+                </div>
+                <div class="compare-metric">
+                  <span style="color:var(--muted)">Total Return</span>
+                  <span class="${p.total_return_pct>=0?'up':'down'}" style="font-family:var(--font-mono)">
+                    ${p.total_return_pct>=0?'+':''}${p.total_return_pct}%
+                  </span>
+                </div>
+                <div class="compare-metric">
+                  <span style="color:var(--muted)">Avg Daily Return</span>
+                  <span class="${p.avg_daily_return>=0?'up':'down'}" style="font-family:var(--font-mono)">
+                    ${p.avg_daily_return>=0?'+':''}${p.avg_daily_return}%
+                  </span>
+                </div>
+                <div class="compare-metric">
+                  <span style="color:var(--muted)">Volatility</span>
+                  <span style="font-family:var(--font-mono)">${p.volatility}</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="corr-badge">
+          Correlation: <strong>${data.correlation}</strong> — ${data.interpretation}
+          &nbsp;|&nbsp; Period: ${data.period_days} days
+        </div>
+      `;
+    } catch(e) {
+      res.innerHTML = `<div class="loader" style="color:var(--red);">Error: ${e.message}</div>`;
+    }
+  }
+
+
+  // ── ML Prediction Chart ──
+  let predictChart = null;
+
+  async function loadPrediction(symbol, forecastDays) {
+    try {
+      const data = await api(`/predict/${symbol}?forecast_days=${forecastDays}`);
+      renderPrediction(data);
+    } catch(e) {
+      document.getElementById('predict-meta').textContent = 'Prediction unavailable';
+    }
+  }
+
+  function renderPrediction(data) {
+    const hist = data.history;
+    const fore = data.forecast;
+    const allDates = [...hist.dates, ...fore.dates];
+
+    // Pad history arrays with nulls into forecast zone
+    const padH = Array(fore.dates.length).fill(null);
+    // Pad forecast arrays with nulls into history zone (except connect point)
+    const connect = hist.actual[hist.actual.length - 1];
+    const padF = Array(hist.dates.length - 1).fill(null);
+
+    const predColor  = data.direction === 'bullish' ? '#34d399' : '#f87171';
+    const bandColor  = data.direction === 'bullish' ? 'rgba(52,211,153,0.12)' : 'rgba(248,113,113,0.12)';
+    const dirEmoji   = data.direction === 'bullish' ? '📈' : '📉';
+
+    document.getElementById('predict-meta').innerHTML =
+      `${dirEmoji} ${data.direction.toUpperCase()} &nbsp;|&nbsp; R²: ${data.r2_score} &nbsp;|&nbsp; ±₹${data.confidence_interval_95}`;
+
+    if (predictChart) predictChart.destroy();
+    const ctx = document.getElementById('predictChart').getContext('2d');
+
+    predictChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: allDates,
+        datasets: [
+          {
+            label: 'Actual Close',
+            data: [...hist.actual, ...padH],
+            borderColor: '#38bdf8',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false,
+          },
+          {
+            label: 'Fitted (Model)',
+            data: [...hist.fitted, ...padH],
+            borderColor: '#fbbf24',
+            borderDash: [4, 3],
+            borderWidth: 1.5,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false,
+          },
+          {
+            label: 'Predicted',
+            data: [...padF, connect, ...fore.predicted],
+            borderColor: predColor,
+            borderWidth: 2.5,
+            pointRadius: 0,
+            tension: 0.3,
+            fill: false,
+          },
+          {
+            label: 'Upper Band (95%)',
+            data: [...padF, connect, ...fore.upper_band],
+            borderColor: 'transparent',
+            backgroundColor: bandColor,
+            pointRadius: 0,
+            fill: '+1',
+            tension: 0.3,
+          },
+          {
+            label: 'Lower Band (95%)',
+            data: [...padF, connect, ...fore.lower_band],
+            borderColor: 'transparent',
+            backgroundColor: bandColor,
+            pointRadius: 0,
+            fill: false,
+            tension: 0.3,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#64748b', font: { family: 'DM Mono', size: 11 }, boxWidth: 20 } },
+          tooltip: {
+            backgroundColor: '#131720', borderColor: '#1f2a3a', borderWidth: 1,
+            titleColor: '#e2e8f0', bodyColor: '#94a3b8',
+            callbacks: { label: ctx => ctx.parsed.y != null ? ` ${ctx.dataset.label}: ₹${ctx.parsed.y?.toLocaleString('en-IN')}` : null }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: '#64748b', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10, maxRotation: 0 },
+            grid: { color: '#1f2a3a' }
+          },
+          y: {
+            ticks: { color: '#64748b', font: { family: 'DM Mono', size: 10 }, callback: v => '₹' + v.toLocaleString('en-IN') },
+            grid: { color: '#1f2a3a' }
+          }
+        }
+      }
+    });
+  }
+
+  // Wire up forecast-days selector
+  document.getElementById('forecastDays').addEventListener('change', function() {
+    if (selectedSymbol) loadPrediction(selectedSymbol, this.value);
+  });
+
+  // ── Bootstrap ──
+  loadCompanies();
+
+
+  async function loadInsights(symbol) {
+  const container = document.getElementById('insights-content');
+  container.innerHTML = 'Loading insights...';
+
+  try {
+    const data = await api(`/insights/${symbol}`);
+
+  container.innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+    <!-- Recommendation -->
+    <div class="stat-card">
+      <div class="stat-label">Recommendation</div>
+      <div class="stat-value" style="
+        color:${data.recommendation === 'BUY' ? '#34d399' : data.recommendation === 'SELL' ? '#f87171' : '#fbbf24'};
+      ">
+        ${data.recommendation}
+      </div>
+      <div class="stat-sub">${data.confidence}% confidence</div>
+    </div>
+
+    <!-- Trend -->
+    <div class="stat-card">
+      <div class="stat-label">Trend</div>
+      <div class="stat-value ${data.trend === 'Bullish' ? 'up' : 'down'}">
+        ${data.trend}
+      </div>
+      <div class="stat-sub">Market direction</div>
+    </div>
+
+    <!-- Reason 1 -->
+    <div class="stat-card">
+      <div class="stat-label">Insight</div>
+      <div class="stat-sub">${data.reasons[0] || ''}</div>
+    </div>
+
+    <!-- Reason 2 -->
+    <div class="stat-card">
+      <div class="stat-label">Risk</div>
+      <div class="stat-sub">${data.reasons[1] || ''}</div>
+    </div>
+
+  </div>
+`; 
+
+  } catch (e) {
+    container.innerHTML = 'Failed to load insights';
+  }
+}
+
+function renderQuickStats(summary) {
+  document.getElementById('quick-stats').innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+    <div class="stat-card">
+      <div class="stat-label">Avg Close</div>
+      <div class="stat-value">₹${summary.avg_close}</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Return</div>
+      <div class="stat-value ${summary.total_return_pct>=0?'up':'down'}">
+        ${summary.total_return_pct}%
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Volatility</div>
+      <div class="stat-value">${summary.volatility_score}</div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-label">Sector</div>
+      <div class="stat-value" style="font-size:1rem;font-family:var(--font-body)">
+        ${summary.sector}
+      </div>
+    </div>
+
+  </div>
+`;
+
+}
+
+function renderInsightsRow(summary, insights) {
+  const sign = v => v >= 0 ? '+' : '';
+
+  document.getElementById('insights-row').innerHTML = `
+    
+    <!-- Recommendation -->
+    <div class="stat-card">
+      <div class="stat-label">Recommendation</div>
+      <div class="stat-value" style="
+        color:${insights.recommendation === 'BUY' ? '#34d399' : insights.recommendation === 'SELL' ? '#f87171' : '#fbbf24'};
+      ">
+        ${insights.recommendation}
+      </div>
+      <div class="stat-sub">${insights.confidence}% confidence</div>
+    </div>
+
+    <!-- Trend -->
+    <div class="stat-card">
+      <div class="stat-label">Trend</div>
+      <div class="stat-value ${insights.trend === 'Bullish' ? 'up' : 'down'}">
+        ${insights.trend}
+      </div>
+    </div>
+
+    <!-- Avg Close -->
+    <div class="stat-card">
+      <div class="stat-label">Avg Close</div>
+      <div class="stat-value">₹${summary.avg_close}</div>
+    </div>
+
+    <!-- Return -->
+    <div class="stat-card">
+      <div class="stat-label">Return</div>
+      <div class="stat-value ${summary.total_return_pct>=0?'up':'down'}">
+        ${sign(summary.total_return_pct)}${summary.total_return_pct}%
+      </div>
+    </div>
+
+    <!-- Volatility -->
+    <div class="stat-card">
+      <div class="stat-label">Volatility</div>
+      <div class="stat-value">${summary.volatility_score}</div>
+    </div>
+
+    <!-- Sector -->
+    <div class="stat-card">
+      <div class="stat-label">Sector</div>
+      <div class="stat-value" style="font-size:1rem;">
+        ${summary.sector}
+      </div>
+    </div>
+
+  `;
+}
+</script>
+</body>
+</html>
