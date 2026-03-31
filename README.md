@@ -2,8 +2,6 @@
  
 > FastAPI · SQLite · Polynomial Regression ML · Docker · Chart.js
 
-## 🚀 Introduction
-
 StockSense is a stock data intelligence dashboard that simplifies complex market data into clear insights. It provides interactive charts, key metrics, AI-based recommendations, stock comparison, and price prediction. The system processes stock data, calculates indicators like returns and volatility, and delivers insights through APIs and a responsive UI to support better decision-making.
 
 
