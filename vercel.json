@@ -1,5 +1,4 @@
 {
- 
-  "buildCommand": "sed -i 's|__API_URL__|$API_URL|g' frontend/config.js"
-
+  "outputDirectory": "frontend",
+  "framework": null
 }
