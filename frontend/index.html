@@ -388,8 +388,10 @@
   </div><!-- /#dashboard -->
 </main>
 
+<script src="config.js"></script>
 <script>
-  const API = 'http://localhost:8000';
+  
+  const API = window.CONFIG.API_URL;
   let allCompanies = [];
   let selectedSymbol = null;
   let selectedDays = 30;
